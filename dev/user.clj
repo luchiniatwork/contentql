@@ -1,38 +1,13 @@
 (ns user
-  (:require [contentful.application]
-            [com.stuartsierra.component :as component]
-            [figwheel-sidecar.config :as fw-config]
-            [figwheel-sidecar.system :as fw-sys]
-            [clojure.tools.namespace.repl :refer [set-refresh-dirs]]
-            [reloaded.repl :refer [system init]]
-            [ring.middleware.reload :refer [wrap-reload]]
-            [figwheel-sidecar.repl-api :as figwheel]
-            [contentful.config :refer [config]]))
+  (:require [contentful.core :as contentful]))
 
-(defn dev-system []
-  (assoc (contentful.application/app-system (config))
-    :figwheel-system (fw-sys/figwheel-system (fw-config/fetch-config))
-    :css-watcher (fw-sys/css-watcher {:watch-paths ["resources/public/css"]})))
 
-(set-refresh-dirs "src" "dev")
-(reloaded.repl/set-init! #(dev-system))
+(def config {:space-id "c3tshf2weg8y"
+             :access-token "e87aea51cfd9193df88f5a1d1b842d9a43cc4f2b02366b7c0ead54fb1b0ad6d4"
+             :mode :live})
 
-(defn cljs-repl []
-  (fw-sys/cljs-repl (:figwheel-system system)))
-
-;; Set up aliases so they don't accidentally
-;; get scrubbed from the namespace declaration
-(def start reloaded.repl/start)
-(def stop reloaded.repl/stop)
-(def go reloaded.repl/go)
-(def reset reloaded.repl/reset)
-(def reset-all reloaded.repl/reset-all)
-
-;; deprecated, to be removed in Chestnut 1.0
-(defn run []
-  (println "(run) is deprecated, use (go)")
-  (go))
-
-(defn browser-repl []
-  (println "(browser-repl) is deprecated, use (cljs-repl)")
-  (cljs-repl))
+(defn go []
+  (let [conn (contentful/create-connection config)]
+    #_(println conn)
+    (contentful/query conn '[{:store-node [:id :name]}
+                             ({:product-node [:id :name]} {:id "3jQ8AiREnCAsOMqOiQ4QoA"})])))
