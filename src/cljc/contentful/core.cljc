@@ -3,9 +3,60 @@
             [cheshire.core :as json]
             [clj-http.client :as http]))
 
+;; ------------------------------
+;; URL field transformations
+;; ------------------------------
+
+(defn ^:private field-name->url
+  "Receives a field name as provided by the query and converts it into what
+  Contentful accepts as a field parameters on URL requests."
+  [query-name]
+  (let [s (name query-name)]
+    (if (= "id" s)
+      (str "sys." s)
+      (str "fields." s))))
+
+(defn ^:private ast-params->params
+  "Receives the AST parameters and cleans them up for internal consumption."
+  [params]
+  params)
+
+(defn ^:private ast-select->select
+  "Receives the AST selection fields and cleans them up for internal consumption."
+  [children]
+  (if children
+    (reduce (fn [a {:keys [type dispatch-key]}]
+              (if (= :prop type)
+                (conj a dispatch-key)))
+            []
+            children)))
+
+(defn ^:private params->url-params
+  "Transforms internal params into URL-ready params for Contentful requests."
+  [params]
+  (if params
+    (let [coll (->> params
+                    (reduce-kv (fn [a k v]
+                                 (conj a (str (field-name->url k) "=" v)))
+                               [])
+                    (interpose "&"))]
+      (str "&" (apply str coll)))))
+
+(defn ^:private select->url-params
+  "Transforms internal field selects into URL-ready params for Contentful requests"
+  [select]
+  (if select
+    (let [coll (->> select
+                    (map field-name->url)
+                    (interpose ","))]
+      (str "&select=" (apply str coll)))))
+
+;; ------------------------------
+;; Fetching functions
+;; ------------------------------
 
 (defn ^:private get-json
-  "Retrieve response body from Contentful's API response"
+  "Retrieves response body from Contentful's API response."
   [url]
   (-> url
       (http/get {:accept :json})
@@ -18,45 +69,8 @@
                      base-coll)))
 
 
-(defn ^:private url-field-name
-  [query-name]
-  (let [s (name query-name)]
-    (if (= "id" s)
-      (str "sys." s)
-      (str "fields." s))))
-
-(defn ^:private ast-params->params
-  [params]
-  params)
-
-(defn ^:private params->url-params
-  [params]
-  (if params
-    (let [coll (->> params
-                    (reduce-kv (fn [a k v]
-                                 (conj a (str (url-field-name k) "=" v)))
-                               [])
-                    (interpose "&"))]
-      (str "&" (apply str coll)))))
-
-(defn ^:private ast-select->select
-  [children]
-  (if children
-    (reduce (fn [a {:keys [type dispatch-key]}]
-              (if (= :prop type)
-                (conj a dispatch-key)))
-            []
-            children)))
-
-(defn ^:private select->url-params
-  [select]
-  (if select
-    (let [coll (->> select
-                    (map url-field-name)
-                    (interpose ","))]
-      (str "&select=" (apply str coll)))))
-
 (defn ^:private build-entities-url
+  "Builds an entries request URL for Contentful."
   [{:keys [entries-url]} content-type {:keys [params select]}]
   (str entries-url
        "&content_type=" (name content-type)
@@ -78,7 +92,9 @@
     (clojure.pprint/pprint url)
     (clojure.pprint/pprint payload)))
 
-
+;; ------------------------------
+;; Public functions
+;; ------------------------------
 
 (defn create-connection
   "Config is `{:space-id \"xxx\" :access-token \"xxx\" :mode :live}`
