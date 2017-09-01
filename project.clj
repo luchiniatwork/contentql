@@ -9,7 +9,8 @@
                  [environ "1.1.0"]
                  [org.omcljs/om "1.0.0-beta1"]
                  [cheshire "5.8.0"]
-                 [clj-http "3.7.0"]]
+                 [clj-http "3.7.0"]
+                 [camel-snake-kebab "0.4.0"]]
 
   :plugins [[lein-cljsbuild "1.1.6"]
             [lein-environ "1.1.0"]]

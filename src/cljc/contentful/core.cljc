@@ -1,5 +1,6 @@
 (ns contentful.core
   (:require [om.next :as om]
+            [camel-snake-kebab.core :refer [->kebab-case-keyword]]
             [cheshire.core :as json]
             [clj-http.client :as http]))
 
@@ -52,6 +53,115 @@
       (str "&select=" (apply str coll)))))
 
 ;; ------------------------------
+;; Image transformation functions
+;; ------------------------------
+
+(defn- calc-by-target-width
+  "Calculates the potential width and height from an anchor on the target width."
+  [t-width o-width o-height]
+  (when (not (nil? t-width))
+    {:width t-width
+     :height (int (/ o-height (/ o-width t-width)))}))
+
+(defn- calc-by-target-height
+  "Calculates the potential width and height from an anchor on the target height."
+  [t-height o-width o-height]
+  (when (not (nil? t-height))
+    {:width (int (/ o-width (/ o-height t-height)))
+     :height t-height}))
+
+(defn- real-resolution
+  "The real resolution is a function of the combined minimum of the target width and height."
+  [t-width t-height o-width o-height]
+  (let [tmp-1 (calc-by-target-width t-width o-width o-height)
+        tmp-2 (calc-by-target-height t-height o-width o-height)
+        r-height (min (:height tmp-1) (:height tmp-2))
+        r-width (min (:width tmp-1) (:width tmp-2))]
+    {:height r-height
+     :width r-width}))
+
+(defn parse-image
+  "Assoc the real dimensions to an image object. It depends on attributes :originalUrl
+  :originalWidth and :originalHeight from the input parameter image-obj.
+
+  The params height and width specify the intended height and width. The function will
+  calculate the minimum resolution based out of any width or height and proportionally
+  scale the other dimension."
+  [image-obj height width]
+  (let [{:keys [originalUrl originalWidth originalHeight]} image-obj
+        target-width (or width originalWidth)
+        target-height (or height originalHeight)
+        real-dimensions (real-resolution target-width target-height
+                                         originalWidth originalHeight)
+        real-width (:width real-dimensions)
+        real-height (:height real-dimensions)]
+    (assoc image-obj
+           :url (str originalUrl "?w=" real-width "&h=" real-height)
+           :width real-width
+           :height real-height)))
+
+(defn ^:private transform-image
+  [field-key raw linked-assets]
+  (let [asset (get linked-assets (:id (:sys raw)))
+        file (:file (:fields asset))]
+    {:width (:width (:image (:details file)))
+     :height (:height (:image (:details file)))
+     :url (str "https:" (:url file))}))
+
+;; ------------------------------
+;; Core transformation functions
+;; ------------------------------
+
+(declare ^:private transform)
+
+(defn ^:private reduce-nested-string?
+  "Helper function for the reducer function that tests for nested string values"
+  [node]
+  (and (vector? node) (string? (first node))))
+
+(defn ^:private reduce-collection?
+  "Helper function for the reducer function that tests for nested collections"
+  [node]
+  (and (coll? node) (:sys (first node))))
+
+(defn ^:private match-linked-entries
+  [base-coll linked-entries]
+  (remove nil? (mapv #(get linked-entries (:id (:sys %)))
+                     base-coll)))
+
+(defn ^:private reducer
+  [{:keys [linked-entries linked-assets] :as options} accum k v]
+  (let [new-key (->kebab-case-keyword (name k))]
+    (assoc accum new-key
+           (cond
+             (map? v) (transform-image new-key v linked-assets)
+             (reduce-collection? v) (transform (assoc options
+                                                      :entries
+                                                      (match-linked-entries v linked-entries)))
+             (reduce-nested-string? v) (first v)
+             :else v))))
+
+(defn ^:private transform-one
+  [entry {:keys [content-type linked-entries linked-assets] :as options}]
+  (when-not (nil? entry)
+    (merge {:id (:id (:sys entry))}
+           (reduce-kv (partial reducer options)
+                      {}
+                      (:fields entry)))))
+
+(defn ^:private transform
+  [{:keys [entries linked-entries linked-assets]
+    :as options}]
+  (mapv #(transform-one % options) entries))
+
+(defn ^:private dictionary-linked-entries
+  [linked-entries]
+  (reduce #(assoc %1 (:id (:sys %2)) %2)
+          {}
+          linked-entries))
+
+
+;; ------------------------------
 ;; Fetching functions
 ;; ------------------------------
 
@@ -63,11 +173,6 @@
       :body
       (json/parse-string true)))
 
-(defn ^:private match-linked-entries
-  [base-coll linked-entries]
-  (remove nil? (mapv #(get linked-entries (:id (:sys %)))
-                     base-coll)))
-
 
 (defn ^:private build-entities-url
   "Builds an entries request URL for Contentful."
@@ -78,19 +183,48 @@
        (select->url-params select)
        (params->url-params params)))
 
+(defn ^:private break-payload
+  [raw]
+  {:entries (:items raw)
+   :linked-entries (dictionary-linked-entries
+                    (-> raw :includes :Entry))
+   :linked-assets (dictionary-linked-entries
+                   (-> raw :includes :Asset))})
+
 (defn ^:private get-entities
   [conn content-type & opts]
-  (let [url (build-entities-url conn content-type (first opts))
-        payload (get-json url)
-        ;;entries (:items payload)
-        ;;linked-entries (dictionary-linked-entries (:Entry (:includes payload)))
-        ;;linked-assets (dictionary-linked-entries (:Asset (:includes payload)))
-        ]
-    #_(transform entries {:entity-type entity-type
-                          :linked-entries linked-entries
-                          :linked-assets linked-assets})
-    (clojure.pprint/pprint url)
-    (clojure.pprint/pprint payload)))
+  (let [url (build-entities-url conn content-type (first opts))]
+    (transform (-> url
+                   get-json
+                   break-payload))))
+
+;; ------------------------------
+;; Query filtering functions
+;; ------------------------------
+
+(declare ^:private filter-query)
+
+(defn ^:private query-reducer
+  [entry m {:keys [type dispatch-key children] :as ast}]
+  (let [v (get entry dispatch-key)
+        res (cond
+              (= type :prop) v
+              (= type :join) (filter-query v ast))]
+    (assoc m dispatch-key res)))
+
+(defn ^:private filter-entry
+  [entry {:keys [children params]}]
+  (reduce (partial query-reducer entry) {} children))
+
+(defn ^:private filter-entries
+  [entries ast]
+  (mapv #(filter-entry % ast) entries))
+
+(defn ^:private filter-query
+  [entries ast]
+  (if (map? entries)
+    (filter-entry entries ast)
+    (filter-entries entries ast)))
 
 ;; ------------------------------
 ;; Public functions
@@ -121,12 +255,11 @@
   [conn query]
   (let [ast (om/query->ast query)]
     (clojure.pprint/pprint ast)
-    (reduce (fn [a {:keys [dispatch-key children params]}]
+    (reduce (fn [m {:keys [dispatch-key children params] :as sub-ast}]
               (let [opts {:select (ast-select->select children)
                           :params (ast-params->params params)}]
-                (println opts)
-                (assoc a dispatch-key (get-entities conn dispatch-key opts)))
-              )
+                (assoc m dispatch-key (-> (get-entities conn dispatch-key opts)
+                                          (filter-query sub-ast)))))
             {}
             (:children ast))))
 

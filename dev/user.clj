@@ -9,5 +9,14 @@
 (defn go []
   (let [conn (contentful/create-connection config)]
     #_(println conn)
-    (contentful/query conn '[{:store-node [:id :name]}
-                             ({:product-node [:id :name]} {:id "3jQ8AiREnCAsOMqOiQ4QoA"})])))
+    ;;{:store-node [:id :name]}
+    ;;({:product-node [:id :name]} {:id "3jQ8AiREnCAsOMqOiQ4QoA"})
+    (contentful/query conn '[({:city-node [:id
+                                           :name
+                                           {:stores [:name
+                                                     :address
+                                                     ({:image [:width
+                                                               :height
+                                                               :url]}
+                                                      {:width 100})]}]}
+                              {:id "3x1YMtJ1CoOWk0ycYsOw4I"})])))
