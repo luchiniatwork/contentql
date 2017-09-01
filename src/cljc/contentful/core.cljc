@@ -17,6 +17,15 @@
       (str "sys." s)
       (str "fields." s))))
 
+(defn ^:private param-name->url
+  "Receives a field name as provided by the query and converts it into what
+  Contentful accepts as a query parameters on URL requests."
+  [query-name]
+  (let [s (name query-name)]
+    (if (= "id" s)
+      (str "sys." s)
+      s)))
+
 (defn ^:private ast-params->params
   "Receives the AST parameters and cleans them up for internal consumption."
   [params]
@@ -27,7 +36,7 @@
   [children]
   (if children
     (reduce (fn [a {:keys [type dispatch-key]}]
-              (if (= :prop type)
+              (if (or (= :prop type) (= :join type))
                 (conj a dispatch-key)))
             []
             children)))
@@ -38,7 +47,7 @@
   (if params
     (let [coll (->> params
                     (reduce-kv (fn [a k v]
-                                 (conj a (str (field-name->url k) "=" v)))
+                                 (conj a (str (param-name->url k) "=" v)))
                                [])
                     (interpose "&"))]
       (str "&" (apply str coll)))))
@@ -147,13 +156,14 @@
              (map? v) (transform-image v linked-assets)
              (reduce-collection? v) (transform (assoc options
                                                       :entries
-                                                      (match-linked-entries v linked-entries)))
+                                                      (match-linked-entries v linked-entries)
+                                                      :root false))
              (reduce-nested-string? v) (first v)
              :else v))))
 
 (defn ^:private transform-one
   "Returns a map representing one entry of a dataset. See `transform` for more details."
-  [entry {:keys [linked-entries linked-assets] :as options}]
+  [entry options]
   (when-not (nil? entry)
     (merge {:id (-> entry :sys :id)}
            (reduce-kv (partial reducer options)
@@ -164,10 +174,16 @@
   "Returns a vector with the transformed entries. The input is a map containing
   the raw `:entries` as well as maps for `:linked-entries` and `:linked-assets`.
 
-  These are used to traverse and build the tree of relationships one would expect."
-  [{:keys [entries linked-entries linked-assets]
+  These are used to traverse and build the tree of relationships one would expect.
+
+  The `:root` TBD and the `:info"
+  [{:keys [root info entries linked-entries linked-assets]
     :as options}]
-  (mapv #(transform-one % options) entries))
+  (let [res (mapv #(transform-one % options) entries)]
+    (if root
+      {:nodes res
+       :info info}
+      res)))
 
 (defn ^:private linked-items->map
   "Transforms a collection of linked Contentful items into a map keyed by the
@@ -190,7 +206,6 @@
       :body
       (json/parse-string true)))
 
-
 (defn ^:private build-entities-url
   "Builds an entries request URL for Contentful."
   [{:keys [entries-url]} content-type {:keys [params select]}]
@@ -202,12 +217,24 @@
 
 (defn ^:private break-payload
   "Organizes the entries, linked entries and linked assets from Contentful a bit better."
-  [raw]
-  {:entries (:items raw)
-   :linked-entries (linked-items->map
-                    (-> raw :includes :Entry))
-   :linked-assets (linked-items->map
-                   (-> raw :includes :Asset))})
+  [{:keys [total skip limit items includes] :as raw}]
+  (let [total-pages (int (Math/ceil (/ total limit)))
+        current-page (- total-pages (int (Math/floor (/ (- total skip) limit))))
+        has-next? (> total-pages current-page)
+        has-prev? (> current-page 1)]
+    {:root true
+     :info {:entries {:total total}
+            :page {:size limit
+                   :current current-page
+                   :total total-pages
+                   :has-next? has-next?
+                   :has-prev? has-prev?}
+            :pagination {:cursor skip
+                         :next-skip (if has-next? (+ skip limit) skip)
+                         :prev-skip (if has-prev? (- skip limit) skip)}}
+     :entries items
+     :linked-entries (linked-items->map (:Entry includes))
+     :linked-assets (linked-items->map (:Asset includes))}))
 
 (defn ^:private get-entities
   "Receives the connection and a content-type id, creates the url to fetch, fetches and
@@ -306,8 +333,9 @@
   (let [ast (om/query->ast query)]
     (reduce (fn [m {:keys [dispatch-key children params] :as sub-ast}]
               (let [opts {:select (ast-select->select children)
-                          :params (ast-params->params params)}]
-                (assoc m dispatch-key (-> (get-entities conn dispatch-key opts)
-                                          (filter-query sub-ast)))))
+                          :params (ast-params->params params)}
+                    entities (get-entities conn dispatch-key opts)]
+                (assoc m dispatch-key {:nodes (-> entities :nodes (filter-query sub-ast))
+                                       :info (:info entities)})))
             {}
             (:children ast))))

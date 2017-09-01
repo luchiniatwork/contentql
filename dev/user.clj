@@ -21,9 +21,13 @@
                                    {:width 100})]}]}
            {:id "3x1YMtJ1CoOWk0ycYsOw4I"})])
 
-(def q2 '[{:product-node [:name
-                          ({:image [:url]}
-                           {:width 524})]}])
+(def q2 '[({:product-node
+            [:name
+             ({:image [:width]}
+              {:width 524})]}
+           {:limit 10 :skip 0
+            :order "-fields.name"})])
+
 (defn go []
   (let [conn (contentful/create-connection config)]
     (contentful/query conn q2)))
