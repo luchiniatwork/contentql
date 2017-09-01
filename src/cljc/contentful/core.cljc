@@ -258,10 +258,10 @@
 (defn ^:private filter-entry
   "Filters a single entry based on the provided query (here represented as an AST)."
   [entry {:keys [children params dispatch-key] :as ast}]
-  (let [res (reduce (partial query-reducer entry) {} children)]
-    (if params
-      (resolver {:ast ast} dispatch-key params res)
-      res)))
+  (let [res (if params
+              (resolver {:ast ast} dispatch-key params entry)
+              entry)]
+    (reduce (partial query-reducer res) {} children)))
 
 (defn ^:private filter-entries
   "See `filter-query` and `filter-entry` for more details."
