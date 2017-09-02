@@ -1,8 +1,8 @@
-(defproject contentful "0.1.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+(defproject luchiniatwork/contentql "0.1.0-SNAPSHOT"
+  :description "Access to Contentful content using Om Next Queries"
+  :url "https://github.com/luchiniatwork/contentful"
+  :license {:name "MIT License"
+            :url "https://opensource.org/licenses/MIT"}
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.908" :scope "provided"]
@@ -23,7 +23,7 @@
 
   :clean-targets ^{:protect false} [:target-path :compile-path "resources/public/js"]
 
-  :uberjar-name "contentful.jar"
+  :uberjar-name "contentql.jar"
 
   ;; nREPL by default starts in the :main namespace, we want to start in `user`
   ;; because that's where our development helper functions like (go) and
@@ -34,25 +34,25 @@
               [{:id "app"
                 :source-paths ["src/cljs" "src/cljc" "dev"]
 
-                :figwheel {:on-jsload "contentful.system/reset"}
+                :figwheel {:on-jsload "contentql.system/reset"}
 
                 :compiler {:main cljs.user
                            :asset-path "js/compiled/out"
-                           :output-to "resources/public/js/compiled/contentful.js"
+                           :output-to "resources/public/js/compiled/contentql.js"
                            :output-dir "resources/public/js/compiled/out"
                            :source-map-timestamp true}}
 
                {:id "test"
                 :source-paths ["src/cljs" "test/cljs" "src/cljc" "test/cljc"]
                 :compiler {:output-to "resources/public/js/compiled/testable.js"
-                           :main contentful.test-runner
+                           :main contentql.test-runner
                            :optimizations :none}}
 
                {:id "min"
                 :source-paths ["src/cljs" "src/cljc"]
                 :jar true
-                :compiler {:main contentful.system
-                           :output-to "resources/public/js/compiled/contentful.js"
+                :compiler {:main contentql.system
+                           :output-to "resources/public/js/compiled/contentql.js"
                            :output-dir "target"
                            :source-map-timestamp true
                            :optimizations :advanced

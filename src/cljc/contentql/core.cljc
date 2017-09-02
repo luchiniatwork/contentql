@@ -1,4 +1,4 @@
-(ns contentful.core
+(ns contentql.core
   (:require [om.next :as om]
             [camel-snake-kebab.core :refer [->kebab-case-keyword]]
             [cheshire.core :as json]
@@ -223,7 +223,7 @@
         has-next? (> total-pages current-page)
         has-prev? (> current-page 1)]
     {:root true
-     :info {:entries {:total total}
+     :info {:nodes {:total total}
             :page {:size limit
                    :current current-page
                    :total total-pages

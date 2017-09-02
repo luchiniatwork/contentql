@@ -1,5 +1,5 @@
 (ns user
-  (:require [contentful.core :as contentful]))
+  (:require [contentql.core :as contentql]))
 
 
 (def config {:space-id "c3tshf2weg8y"
@@ -25,9 +25,9 @@
             [:name
              ({:image [:width]}
               {:width 524})]}
-           {:limit 10 :skip 0
-            :order "-fields.name"})])
+           {:limit 4 :skip 0
+            :order "fields.name"})])
 
 (defn go []
-  (let [conn (contentful/create-connection config)]
-    (contentful/query conn q2)))
+  (let [conn (contentql/create-connection config)]
+    (contentql/query conn q2)))

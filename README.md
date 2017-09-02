@@ -1,144 +1,202 @@
-# contentful
+# ContentQL
 
+ContentQL allows one to access Contentful data using Om Next Queries.
 
-## Development
+[Contentful](https://www.contentful.com/) is a popular headless, cloud-based CMS system. Beyond
+being purely an API-first CMS system it also supports somewhat complex data schemas, responsive
+images and webhooks.
 
-Open a terminal and type `lein repl` to start a Clojure REPL
-(interactive prompt).
+Despite the great features provided by Contentful, one thing remains somewhat challenging:
+its API is not necessarily the greatest.
 
-In the REPL, type
+Instead of porting Contentful's API on a one-on-one basis to Clojure and ClojureScript, this
+library takes an abstraction route to querying: it uses Om Next's Query language as its main
+interface.
+
+## Table of Contents
+
+* [Getting Started](#getting-started)
+* [Motivation](#motivation)
+* [Query Syntax](#query-syntax)
+* [Usage](#usage)
+* [Pagination](#pagination)
+* [Bugs](#bugs)
+* [Help!](#help)
+
+## Getting Started
+
+Add the following dependency to your `project.clj` file:
+
+[![Clojars Project](http://clojars.org/luchiniatwork/contentql/latest-version.svg)](http://clojars.org/luchiniatwork/contentql)
+
+## Motivation
+
+By using Om Next queries one can:
+
+* easily describe deep nested joins
+* clearly parameterize root (as well as other) queries
+* easily express field selections
+* easily dispatch queries to Contentful from Om Next remotes
+* easy-to-use responsive images as part of the query
+* describe your queries using macro syntax
+
+## Query Syntax
+
+The Om Next query syntax is beautifuly described by António Monteiro [here](https://anmonteiro.com/2016/01/om-next-query-syntax/) but if you need a quick primer, here it is:
+
+### Simple properties
+
+If you have a content type called `blogs`, you can query its entries with:
 
 ```clojure
-(go)
-(cljs-repl)
+[:blogs]
 ```
 
-The call to `(go)` starts the Figwheel server at port 3449, which takes care of
-live reloading ClojureScript code and CSS, and the app server at port 10555 
-which forwards requests to the http-handler you define.
+You can always combine several content types in one go:
 
-Running `(cljs-repl)` starts the Figwheel ClojureScript REPL. Evaluating
-expressions here will only work once you've loaded the page, so the browser can
-connect to Figwheel.
-
-When you see the line `Successfully compiled "resources/public/app.js" in 21.36
-seconds.`, you're ready to go. Browse to `http://localhost:10555` and enjoy.
-
-**Attention: It is not needed to run `lein figwheel` separately. Instead `(go)`
-launches Figwheel directly from the REPL**
-
-## Trying it out
-
-If all is well you now have a browser window saying 'Hello Chestnut',
-and a REPL prompt that looks like `cljs.user=>`.
-
-Open `resources/public/css/style.css` and change some styling of the
-H1 element. Notice how it's updated instantly in the browser.
-
-Open `src/cljs/contentful/core.cljs`, and change `dom/h1` to
-`dom/h2`. As soon as you save the file, your browser is updated.
-
-In the REPL, type
-
-```
-(ns contentful.core)
-(swap! app-state assoc :text "Interactivity FTW")
+```clojure
+[:blogs :articles]
 ```
 
-Notice again how the browser updates.
+### Joins
 
-### Lighttable
+If you want just the `title` and the `body` of your `blogs`, you can use a join such as:
 
-Lighttable provides a tighter integration for live coding with an inline
-browser-tab. Rather than evaluating cljs on the command line with the Figwheel
-REPL, you can evaluate code and preview pages inside Lighttable.
-
-Steps: After running `(go)`, open a browser tab in Lighttable. Open a cljs file
-from within a project, go to the end of an s-expression and hit Cmd-ENT.
-Lighttable will ask you which client to connect. Click 'Connect a client' and
-select 'Browser'. Browse to [http://localhost:10555](http://localhost:10555)
-
-View LT's console to see a Chrome js console.
-
-Hereafter, you can save a file and see changes or evaluate cljs code (without
-saving a file).
-
-### Emacs/CIDER
-
-CIDER is able to start both a Clojure and a ClojureScript REPL simultaneously,
-so you can interact both with the browser, and with the server. The command to
-do this is `M-x cider-jack-in-clojurescript`.
-
-We need to tell CIDER how to start a browser-connected Figwheel REPL though,
-otherwise it will use a JavaScript engine provided by the JVM, and you won't be
-able to interact with your running app.
-
-Put this in your Emacs configuration (`~/.emacs.d/init.el` or `~/.emacs`)
-
-``` emacs-lisp
-(setq cider-cljs-lein-repl
-      "(do (user/go)
-           (user/cljs-repl))")
+```clojure
+[{:blogs [:title :body]}]
 ```
 
-Now `M-x cider-jack-in-clojurescript` (shortcut: `C-c M-J`, that's a capital
-"J", so `Meta-Shift-j`), point your browser at `http://localhost:10555`, and
-you're good to go.
+### Nested joins
 
-## Testing
+Assuming your `blogs` content type has an `author` embedded whose `name` you want to fetch
+as well, simply nest your joins:
 
-To run the Clojure tests, use
-
-``` shell
-lein test
+```clojure
+[{:blogs [:title :body
+          {:author [:name]}]}]
 ```
 
-To run the Clojurescript you use [doo](https://github.com/bensu/doo). This can
-run your tests against a variety of JavaScript implementations, but in the
-browser and "headless". For example, to test with PhantomJS, use
+This will continue to give you the `title` and the `body` of each blog entry but now also
+the name of each blog's author.
 
-``` shell
-lein doo phantom
+### Parametrized queries
+
+Queries can be parametrized by using a list where the second element is a map of parameters.
+If you want the blog identified by `id` `"3x1YMtJ1CoOWk0ycYsOw4I"` you can fetch it with:
+
+```clojure
+[(:blogs {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 
-## Deploying to Heroku
+This can be combined with joins, ie:
 
-This assumes you have a
-[Heroku account](https://signup.heroku.com/dc), have installed the
-[Heroku toolbelt](https://toolbelt.heroku.com/), and have done a
-`heroku login` before.
-
-``` sh
-git init
-git add -A
-git commit
-heroku create
-git push heroku master:master
-heroku open
+```clojure
+[({:blogs [:title :body]} {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 
-## Running with Foreman
+Or even nested joins:
 
-Heroku uses [Foreman](http://ddollar.github.io/foreman/) to run your
-app, which uses the `Procfile` in your repository to figure out which
-server command to run. Heroku also compiles and runs your code with a
-Leiningen "production" profile, instead of "dev". To locally simulate
-what Heroku does you can do:
+```clojure
+[({:blogs [:title :body
+           {:author [:name]}]}
+  {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
+```
+### Supported parameters for Query roots
 
-``` sh
-lein with-profile -dev,+production uberjar && foreman start
+All your content types can be queries as part of a query root.
+
+You've already seen above how to query a specific entry by its `id`:
+
+```clojure
+[(:blogs {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 
-Now your app is running at
-[http://localhost:5000](http://localhost:5000) in production mode.
+In addition to `:id` the other supported query root parameters are:
+
+* `:limit` - limits the page size to its value (i.e. `:limit 10`)
+* `:skip` - skips the specified number of entries (i.e. `:skip 5` skips 5 entries)
+* `:order` - allows ordering of the entries (i.e. `:order "fields.name"` ordres the dataset by `name`). Reverse ordering is supported with the addition of `-` (i.e. `:order "-fields.name"`)
+
+### Supported parameters for Images
+
+Any image asset is immidetally wrapped in an image entity containing three fields `:width`, `:height` and `:url`. The asset can be scaled up or down by sending the intended `:width` or `:height` parameter.
+
+In order to see it in action, suppose your `author` has an `avatar` image and you want it constrained within a `width` of 150 pixels:
+
+```clojure
+[{:authors [({:avatar [:width
+                       :height
+                       :url]}
+             {:width 150})]}]
+```
+
+## Usage
+
+Require `contentql.core`:
+
+```clojure
+(ns my-project
+  (:require [contentql.core :as contentql]))
+```
+
+Create a connection with `contentql/create-connection`. It receives three fields `:space-id`, `:access-token` and `:mode`. Use the space id and access token found on your Contentful dashboard. `:mode` shouild be either `:live` (for production) or `:preview` for (guess what, preview mode).
+
+```clojure
+(let [config {:space-id "c3tshf2weg8y"
+              :access-token "e87aea51cfd9193df88f5a1d1b842d9a43cc4f2b02366b7c0ead54fb1b0ad6d4"
+              :mode :live}
+      conn (contentql/create-connection config)])
+```
+
+Once your connection is created, send it to `contentql/query` with your query along:
+
+```clojure
+(let [config {:space-id "c3tshf2weg8y"
+              :access-token "e87aea51cfd9193df88f5a1d1b842d9a43cc4f2b02366b7c0ead54fb1b0ad6d4"
+              :mode :live}
+      conn (contentql/create-connection config)]
+  (contentql/query conn '[{:blogs [:id :title]}]))
+```
+
+## Pagination
+
+Pagination is supported by default on all query root (all your content types). Your response
+will be wrapped in a map containing a `:nodes` field and an `:info` field. The former will
+encapsulate the entries for the current page while info gives you some metadata about the
+total universe of entries and the page you are in. This is a typical `:info` map:
+
+```clojure
+{:nodes {:total 33}
+ :page {:size 4
+        :current 1
+        :total 9
+        :has-next? true
+        :has-prev? false}
+ :pagination {:cursor 0
+              :next-skip 4
+              :prev-skip 0}}
+```
+
+This tells us that there are `33` total nodes in the dataset while the page size is `4`.
+This payload represents page `1` of a total of `9` pages. There are a next page from where we
+are but no previous page. The starting cursor for the page is entry `0` (the very first one)
+and to get to the next page we need to skip `4` entries.
+
+Pagination is achieved by manipulating the parameters `:limit` (to specify page size) and
+`:skip` (to specify how many entries to skip). These two parameters can be sent to any query
+root.
+
+## Bugs
+
+If you find a bug, submit a [Github issue](https://github.com/luchiniatwork/contentql/issues).
+
+## Help
+
+This project is looking for team members who can help this project succeed!
+If you are interested in becoming a team member please open an issue.
 
 ## License
 
-Copyright © 2016 FIXME
+Copyright © 2017 Tiago Luchini
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
-
-## Chestnut
-
-Created with [Chestnut](http://plexus.github.io/chestnut/) 0.15.2 (e2759aff).
+Distributed under the MIT License.
