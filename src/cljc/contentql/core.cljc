@@ -1,8 +1,16 @@
 (ns contentql.core
+  #?(:cljs
+     (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require [om.next :as om]
             [camel-snake-kebab.core :refer [->kebab-case-keyword]]
-            [cheshire.core :as json]
-            [clj-http.client :as http]))
+            #?@(:clj
+                [[clj-http.client :as http]
+                 [clojure.core.async :refer [<! >! chan go]]
+                 [cheshire.core :as json]]
+                :cljs
+                [[cljs-http.client :as http]
+                 [goog.math :as math]
+                 [cljs.core.async :refer [<!] :as async]])))
 
 ;; ------------------------------
 ;; URL field transformations
@@ -193,6 +201,16 @@
           {}
           linked-items))
 
+;; ------------------------------
+;; Cross platform wrappers
+;; ------------------------------
+(defn ^:private ceil [n]
+  #?(:clj  (Math/ceil n)
+     :cljs (math/safeCeil n)))
+
+(defn ^:private floor [n]
+  #?(:clj  (Math/floor n)
+     :cljs (math/safeFloor n)))
 
 ;; ------------------------------
 ;; Fetching functions
@@ -201,10 +219,24 @@
 (defn ^:private get-json
   "Retrieves response body from Contentful's API response."
   [url]
-  (-> url
-      (http/get {:accept :json})
-      :body
-      (json/parse-string true)))
+  #?(:cljs
+     ;; This manual casting of the body is needed because Contentful returns content-type
+     ;; application/vnd.contentful.delivery.v1+json instead of application/json and
+     ;; cljs-http does not understand it as a json and, correctly, does not parse the body.
+     ;; A more elegant approach would be to extend cljs-http to support a new wrapper for
+     ;; this specifc content-type but this seemed like an overkill
+     (go (let [res (<! (http/get url {:with-credentials? false}))]
+           (as-> res x
+             (:body x)
+             (.parse js/JSON x)
+             (js->clj x :keywordize-keys true))))
+     :clj
+     (let [c (chan)]
+       (go (>! c (-> url
+                     (http/get {:accept :json})
+                     :body
+                     (json/parse-string true))))
+       c)))
 
 (defn ^:private build-entities-url
   "Builds an entries request URL for Contentful."
@@ -218,8 +250,8 @@
 (defn ^:private break-payload
   "Organizes the entries, linked entries and linked assets from Contentful a bit better."
   [{:keys [total skip limit items includes] :as raw}]
-  (let [total-pages (int (Math/ceil (/ total limit)))
-        current-page (- total-pages (int (Math/floor (/ (- total skip) limit))))
+  (let [total-pages (int (ceil (/ total limit)))
+        current-page (- total-pages (int (floor (/ (- total skip) limit))))
         has-next? (> total-pages current-page)
         has-prev? (> current-page 1)]
     {:root true
@@ -247,9 +279,8 @@
   `:params` - any parameters sent to this fetching of this content-type"
   [conn content-type & opts]
   (let [url (build-entities-url conn content-type (first opts))]
-    (transform (-> url
-                   get-json
-                   break-payload))))
+    (go (let [res (<! (get-json url))]
+          (transform (break-payload res))))))
 
 ;; ------------------------------
 ;; Query filtering functions
@@ -330,12 +361,12 @@
 
 (defn query
   [conn query]
-  (let [ast (om/query->ast query)]
-    (reduce (fn [m {:keys [dispatch-key children params] :as sub-ast}]
-              (let [opts {:select (ast-select->select children)
-                          :params (ast-params->params params)}
-                    entities (get-entities conn dispatch-key opts)]
-                (assoc m dispatch-key {:nodes (-> entities :nodes (filter-query sub-ast))
-                                       :info (:info entities)})))
-            {}
-            (:children ast))))
+  (go (let [ast (om/query->ast query)
+            out (atom {})]
+        (doseq [{:keys [dispatch-key children params] :as sub-ast} (:children ast)]
+          (let [opts {:select (ast-select->select children)
+                      :params (ast-params->params params)}
+                entities (<! (get-entities conn dispatch-key opts))]
+            (swap! out assoc dispatch-key {:nodes (-> entities :nodes (filter-query sub-ast))
+                                           :info (:info entities)})))
+        @out)))

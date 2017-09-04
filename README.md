@@ -4,10 +4,10 @@ ContentQL allows one to access Contentful data using Om Next Queries.
 
 [Contentful](https://www.contentful.com/) is a popular headless, cloud-based CMS system. Beyond
 being purely an API-first CMS system it also supports somewhat complex data schemas, responsive
-images and webhooks.
+images and webhooks making it a very compelling content platform.
 
 Despite the great features provided by Contentful, one thing remains somewhat challenging:
-its API is not necessarily the greatest.
+its API is not the most straightforward to use.
 
 Instead of porting Contentful's API on a one-on-one basis to Clojure and ClojureScript, this
 library takes an abstraction route to querying: it uses Om Next's Query language as its main
@@ -17,6 +17,7 @@ interface.
 
 * [Getting Started](#getting-started)
 * [Motivation](#motivation)
+* [Features](#features)
 * [Query Syntax](#query-syntax)
 * [Usage](#usage)
 * [Pagination](#pagination)
@@ -39,6 +40,17 @@ By using Om Next queries one can:
 * easily dispatch queries to Contentful from Om Next remotes
 * easy-to-use responsive images as part of the query
 * describe your queries using macro syntax
+
+## Features
+
+ContentQL's key features are:
+
+1. Support for both Clojure and ClojureScript
+2. Seamless `clojure.core.async` and `cljs.core.async` support
+3. Use with or without Om Next - it's your call
+4. Access to deep field selectors
+5. Access to filters, ordering, and pagination
+6. Dead simple, cached, responsive images
 
 ## Query Syntax
 
@@ -132,30 +144,47 @@ In order to see it in action, suppose your `author` has an `avatar` image and yo
 
 ## Usage
 
-Require `contentql.core`:
+Async channels are slightly different between Clojure and ClojureScript due to underlying characteristics of how the JVM and the JavaScript environment deal with multi-threading. ContentQL supports both platforms seamlessly.
+
+For Clojure, require `contentql.core` and `clojure.core.async`:
 
 ```clojure
 (ns my-project
-  (:require [contentql.core :as contentql]))
+  (:require [contentql.core :as contentql]
+            [clojure.core.async :refer [go <!]]))
 ```
 
-Create a connection with `contentql/create-connection`. It receives three fields `:space-id`, `:access-token` and `:mode`. Use the space id and access token found on your Contentful dashboard. `:mode` shouild be either `:live` (for production) or `:preview` for (guess what, preview mode).
+For ClojureScript, require `contentql.core` and `cljs.core.async`:
 
 ```clojure
-(let [config {:space-id "c3tshf2weg8y"
-              :access-token "e87aea51cfd9193df88f5a1d1b842d9a43cc4f2b02366b7c0ead54fb1b0ad6d4"
-              :mode :live}
-      conn (contentql/create-connection config)])
+(ns my-project
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [contentql.core :as contentql]
+            [cljs.core.async :refer [<!]]))
+```
+
+Then create a Contentful connection with `contentql/create-connection`. It receives three fields `:space-id`, `:access-token` and `:mode`. Use the space id and access token found on your Contentful dashboard. `:mode` should be either `:live` (for production environment) or `:preview` for (guess what, preview mode).
+
+```clojure
+(def config {:space-id "c3tshf2weg8y"
+             :access-token "e87aea51cfd9193df88f5a1d1b842d9a43cc4f2b02366b7c0ead54fb1b0ad6d4"
+             :mode :live})
+
+(def conn (contentql/create-connection config))
 ```
 
 Once your connection is created, send it to `contentql/query` with your query along:
 
 ```clojure
-(let [config {:space-id "c3tshf2weg8y"
-              :access-token "e87aea51cfd9193df88f5a1d1b842d9a43cc4f2b02366b7c0ead54fb1b0ad6d4"
-              :mode :live}
-      conn (contentql/create-connection config)]
-  (contentql/query conn '[{:blogs [:id :title]}]))
+(go 
+  (let [res (<! (contentql/query conn '[{:blogs [:id :title]}]))]
+    (println res)))
+```
+
+`contentql/query` returns an async channel. The snippet above uses a `go` block to send the code to a separate thread. If you are in Clojure and want a blocking alternative, simply import `<!!` from `clojure.core.async` and use the returned channel like this:
+
+```clojure
+(<!! (contentql/query conn '[{:blogs [:id :title]}]))
 ```
 
 ## Pagination
