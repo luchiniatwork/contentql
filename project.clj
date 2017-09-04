@@ -1,4 +1,4 @@
-(defproject luchiniatwork/contentql "0.1.2-SNAPSHOT"
+(defproject luchiniatwork/contentql "0.1.2"
   :description "Access to Contentful content using Om Next Queries"
   :url "https://github.com/luchiniatwork/contentql"
   :license {:name "MIT License"
