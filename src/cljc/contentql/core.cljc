@@ -184,7 +184,8 @@
 
   These are used to traverse and build the tree of relationships one would expect.
 
-  The `:root` TBD and the `:info"
+  The `:root` field indicates whether this node represents the root node of the
+  response and the `:info` node carries pagination information."
   [{:keys [root info entries linked-entries linked-assets]
     :as options}]
   (let [res (mapv #(transform-one % options) entries)]
