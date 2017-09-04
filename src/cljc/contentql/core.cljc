@@ -320,7 +320,9 @@
   (let [res (if params
               (resolver {:ast ast} dispatch-key params entry)
               entry)]
-    (reduce (partial query-reducer res) {} children)))
+    (if children
+      (reduce (partial query-reducer res) {} children)
+      res)))
 
 (defn ^:private filter-entries
   "See `filter-query` and `filter-entry` for more details."
