@@ -1,7 +1,7 @@
 (ns contentql.core
   #?(:cljs
      (:require-macros [cljs.core.async.macros :refer [go]]))
-  (:require [om.next :as om]
+  (:require [om.next.impl.parser :as parser]
             [camel-snake-kebab.core :refer [->kebab-case-keyword]]
             #?@(:clj
                 [[clj-http.client :as http]
@@ -362,7 +362,7 @@
 
 (defn query
   [conn query]
-  (go (let [ast (om/query->ast query)
+  (go (let [ast (parser/query->ast query)
             out (atom {})]
         (doseq [{:keys [dispatch-key children params] :as sub-ast} (:children ast)]
           (let [opts {:select (ast-select->select children)
