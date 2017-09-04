@@ -61,13 +61,13 @@ The Om Next query syntax is beautifuly described by António Monteiro [here](htt
 If you have a content type called `blogs`, you can query its entries with:
 
 ```clojure
-[:blogs]
+'[:blogs]
 ```
 
 You can always combine several content types in one go:
 
 ```clojure
-[:blogs :articles]
+'[:blogs :articles]
 ```
 
 ### Joins
@@ -75,7 +75,7 @@ You can always combine several content types in one go:
 If you want just the `title` and the `body` of your `blogs`, you can use a join such as:
 
 ```clojure
-[{:blogs [:title :body]}]
+'[{:blogs [:title :body]}]
 ```
 
 ### Nested joins
@@ -84,8 +84,8 @@ Assuming your `blogs` content type has an `author` embedded whose `name` you wan
 as well, simply nest your joins:
 
 ```clojure
-[{:blogs [:title :body
-          {:author [:name]}]}]
+'[{:blogs [:title :body
+           {:author [:name]}]}]
 ```
 
 This will continue to give you the `title` and the `body` of each blog entry but now also
@@ -97,21 +97,21 @@ Queries can be parametrized by using a list where the second element is a map of
 If you want the blog identified by `id` `"3x1YMtJ1CoOWk0ycYsOw4I"` you can fetch it with:
 
 ```clojure
-[(:blogs {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
+'[(:blogs {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 
 This can be combined with joins, ie:
 
 ```clojure
-[({:blogs [:title :body]} {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
+'[({:blogs [:title :body]} {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 
 Or even nested joins:
 
 ```clojure
-[({:blogs [:title :body
-           {:author [:name]}]}
-  {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
+'[({:blogs [:title :body
+            {:author [:name]}]}
+   {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 ### Supported parameters for Query roots
 
@@ -120,7 +120,7 @@ All your content types can be queries as part of a query root.
 You've already seen above how to query a specific entry by its `id`:
 
 ```clojure
-[(:blogs {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
+'[(:blogs {:id "3x1YMtJ1CoOWk0ycYsOw4I"})]
 ```
 
 In addition to `:id` the other supported query root parameters are:
@@ -136,10 +136,10 @@ Any image asset is immidetally wrapped in an image entity containing three field
 In order to see it in action, suppose your `author` has an `avatar` image and you want it constrained within a `width` of 150 pixels:
 
 ```clojure
-[{:authors [({:avatar [:width
-                       :height
-                       :url]}
-             {:width 150})]}]
+'[{:authors [({:avatar [:width
+                        :height
+                        :url]}
+              {:width 150})]}]
 ```
 
 ## Usage
