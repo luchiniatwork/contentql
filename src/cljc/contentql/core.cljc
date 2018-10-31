@@ -342,15 +342,17 @@
 ;; ------------------------------
 
 (defn create-connection
-  "Config is `{:space-id \"xxx\" :access-token \"xxx\" :mode :live}`
+  "Config is `{:space-id \"xxx\" :access-token \"xxx\" :mode :live :environment \"xxx\"}`
   `:mode` can be `:live` or `:preview`"
-  [{:keys [space-id access-token mode]}]
+  [{:keys [space-id access-token environment mode]}]
   (let [base-url (if (= mode :live)
                    "https://cdn.contentful.com"
                    "https://preview.contentful.com")
         space-url (str base-url
                        "/spaces/"
-                       space-id)
+                       space-id
+                       "/environments/"
+                       environment)
         entries-url (str space-url
                          "/entries?access_token="
                          access-token)
