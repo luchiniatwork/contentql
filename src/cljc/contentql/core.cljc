@@ -125,12 +125,22 @@
   the image."
   [raw linked-assets]
   (let [asset (get linked-assets (-> raw :sys :id))
-        file (-> asset :fields :file)
+        fields (-> asset :fields)
+        title (-> fields :title)
+        description (-> fields :description)
+        file (-> fields :file)
         image (-> file :details :image)
+        contentType (-> file :contentType)
         {:keys [width height]} image]
-    {:width width
+    {:title title
+     :description description
+     :contentType contentType
+     :width width
      :height height
-     :url (str "https:" (:url file))}))
+     :url (if (string? (:url file))
+            (str "https:" (:url file))
+            nil)}))
+
 
 ;; ------------------------------
 ;; Core transformation functions
@@ -342,15 +352,17 @@
 ;; ------------------------------
 
 (defn create-connection
-  "Config is `{:space-id \"xxx\" :access-token \"xxx\" :mode :live}`
+  "Config is `{:space-id \"xxx\" :access-token \"xxx\" :mode :live :environment \"xxx\"}`
   `:mode` can be `:live` or `:preview`"
-  [{:keys [space-id access-token mode]}]
+  [{:keys [space-id access-token environment mode]}]
   (let [base-url (if (= mode :live)
                    "https://cdn.contentful.com"
                    "https://preview.contentful.com")
         space-url (str base-url
                        "/spaces/"
-                       space-id)
+                       space-id
+                       "/environments/"
+                       environment)
         entries-url (str space-url
                          "/entries?access_token="
                          access-token)
