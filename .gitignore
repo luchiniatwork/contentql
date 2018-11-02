@@ -10,6 +10,8 @@
 /out/
 /resources/public/js/compiled/**
 /target/
+.idea/
+contentql.iml
 figwheel_server.log
 pom.xml
 pom.xml.asc
