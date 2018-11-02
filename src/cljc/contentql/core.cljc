@@ -125,12 +125,21 @@
   the image."
   [raw linked-assets]
   (let [asset (get linked-assets (-> raw :sys :id))
-        file (-> asset :fields :file)
+        fields (-> asset :fields)
+        title (-> fields :title)
+        description (-> fields :description)
+        file (-> fields :file)
         image (-> file :details :image)
+        contentType (-> file :contentType)
         {:keys [width height]} image]
-    {:width width
+    {:title title
+     :description description
+     :contentType contentType
+     :width width
      :height height
-     :url (str "https:" (:url file))}))
+     :url (if (string? (:url file))
+            (str "https:" (:url file))
+            nil)}))
 
 ;; ------------------------------
 ;; Core transformation functions
