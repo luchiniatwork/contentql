@@ -1,17 +1,17 @@
-(defproject luchiniatwork/contentql "0.1.2"
+(defproject luchiniatwork/contentql "0.2.0"
   :description "Access to Contentful content using Om Next Queries"
   :url "https://github.com/luchiniatwork/contentql"
   :license {:name "MIT License"
             :url "https://opensource.org/licenses/MIT"}
 
   :dependencies [[camel-snake-kebab "0.4.0"]
-                 [clj-http "3.7.0"]
-                 [cljs-http "0.1.43"]
-                 [cheshire "5.8.0"]
+                 [clj-http "3.9.1"]
+                 [cljs-http "0.1.45"]
+                 [cheshire "5.8.1"]
                  [environ "1.1.0"]
-                 [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.908" :scope "provided"]
-                 [org.clojure/core.async "0.3.443"]
+                 [org.clojure/clojure "1.9.0"]
+                 [org.clojure/clojurescript "1.10.339" :scope "provided"]
+                 [org.clojure/core.async "0.4.474"]
                  [org.omcljs/om "1.0.0-beta1"]
                  [org.clojure/tools.namespace "0.2.11"]]
 
@@ -63,11 +63,11 @@
 
   :profiles {:dev
              {:source-paths ["dev"]
-              :dependencies [[figwheel "0.5.13"]
-                             [figwheel-sidecar "0.5.13"]
+              :dependencies [[figwheel "0.5.17"]
+                             [figwheel-sidecar "0.5.17"]
                              [com.cemerick/piggieback "0.2.2"]
                              [org.clojure/tools.nrepl "0.2.13"]
-                             [reloaded.repl "0.2.3"]]
+                             [reloaded.repl "0.2.4"]]
               :plugins [[lein-figwheel "0.5.10"]]
               :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}
 
