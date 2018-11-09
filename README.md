@@ -216,6 +216,15 @@ Pagination is achieved by manipulating the parameters `:limit` (to specify page 
 `:skip` (to specify how many entries to skip). These two parameters can be sent to any query
 root.
 
+## Content Type, Type Name and ID
+
+Queries made to ContentQL will include a `content-type`, `type-name` and
+`id` field by default. `content-type` can be found in any asset that is 
+returned from Contentful, and will contain the asset type and extension. 
+`type-name` will return the content model of a field and will contain the 
+content type ID. Lastly, the `id` field contains the entry ID that can be 
+used to identify a specific content.
+
 ## Bugs
 
 If you find a bug, submit a [Github issue](https://github.com/luchiniatwork/contentql/issues).

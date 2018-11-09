@@ -134,7 +134,7 @@
         {:keys [width height]} image]
     {:title title
      :description description
-     :contentType contentType
+     :content-type contentType
      :width width
      :height height
      :url (if (string? (:url file))
@@ -182,7 +182,8 @@
   "Returns a map representing one entry of a dataset. See `transform` for more details."
   [entry options]
   (when-not (nil? entry)
-    (merge {:id (-> entry :sys :id)}
+    (merge {:id (-> entry :sys :id)
+            :type-name (-> entry :sys :contentType :sys :id)}
            (reduce-kv (partial reducer options)
                       {}
                       (:fields entry)))))
