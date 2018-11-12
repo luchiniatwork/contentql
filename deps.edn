@@ -1,0 +1,28 @@
+{:paths ["src/clj" "src/cljs" "src/cljc"]
+
+ :deps
+ {camel-snake-kebab           {:mvn/version "0.4.0"}
+  clj-http                    {:mvn/version "3.9.1"}
+  cljs-http                   {:mvn/version "0.1.45"}
+  cheshire                    {:mvn/version "5.8.1"}
+  environ                     {:mvn/version "1.1.0"}
+  org.clojure/clojure         {:mvn/version "1.9.0"}
+  org.clojure/clojurescript   {:mvn/version "1.10.439"}
+  org.clojure/core.async      {:mvn/version "0.4.474"}
+  org.omcljs/om               {:mvn/version "1.0.0-beta1"}
+  org.clojure/tools.namespace {:mvn/version "0.2.11"}}
+ 
+ :aliases
+ {:dev
+  {:extra-paths ["dev"]
+   :extra-deps
+   {figwheel                  {:mvn/version "0.5.17"}
+    figwheel-sidecar          {:mvn/version"0.5.17"}
+    com.cemerick/piggieback   {:mvn/version "0.2.2"}
+    org.clojure/tools.nrepl   {:mvn/version "0.2.13"}
+    reloaded.repl             {:mvn/version "0.2.4"}}}
+
+  :outdated
+  {:extra-deps
+   {olical/depot {:mvn/version "1.4.0"}}
+   :main-opts ["-m depot.outdated.main"]}}}
