@@ -3,6 +3,7 @@
      (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require [om.next.impl.parser :as parser]
             [camel-snake-kebab.core :refer [->kebab-case-keyword]]
+            [clojure.string :as string]
             #?@(:clj
                 [[clj-http.client :as http]
                  [clojure.core.async :refer [<! >! chan go]]
@@ -157,11 +158,35 @@
   [node]
   (and (coll? node) (:sys (first node))))
 
+(defn ^:private reduce-map-asset?
+  "Helper function for the reducer function that tests if the given map is of type asset"
+  [node]
+  (and (map? node) (= (-> node
+                          :sys
+                          :linkType
+                          string/lower-case) "asset")))
+
+(defn ^:private reduce-map-not-asset?
+  "Helper function for the reducer function that tests for a map that is not an asset"
+  [node]
+  (and (map? node) (not (= (-> node
+                               :sys
+                               :linkType
+                               string/lower-case) "asset"))))
+
 (defn ^:private match-linked-entries
   "Returns a vector with the linked-entries that match the ids of the provided dataset."
   [base-coll linked-entries]
   (remove nil? (mapv #(get linked-entries (-> % :sys :id))
                      base-coll)))
+
+(defn ^:private transform-collection
+  "Returns a modified linked entries list"
+  [node options linked-entries]
+  (transform (assoc options
+               :entries
+               (match-linked-entries node linked-entries)
+               :root false)))
 
 (defn ^:private reducer
   "This reducer is te core of the recursive transformation. It uses the linked entries
@@ -169,14 +194,20 @@
   [{:keys [linked-entries linked-assets] :as options} accum k v]
   (let [new-key (->kebab-case-keyword (name k))]
     (assoc accum new-key
-           (cond
-             (map? v) (transform-image v linked-assets)
-             (reduce-collection? v) (transform (assoc options
-                                                      :entries
-                                                      (match-linked-entries v linked-entries)
-                                                      :root false))
-             (reduce-nested-string? v) (first v)
-             :else v))))
+                 (cond
+                   ; There are scenarios in which you can have a map that is not an Asset
+                   ; (such as a single reference field).
+                   ; These two functions (reduce-map-asset? & reduce-map-not-asset?)
+                   ; will differentiate between the two and apply the right transformations.
+                   (reduce-map-asset? v) (transform-image v linked-assets)
+
+                   (reduce-map-not-asset? v) (let [vector-v (vector v)]
+                                               (transform-collection vector-v options linked-entries))
+
+                   (reduce-collection? v) (transform-collection v options linked-entries)
+
+                   (reduce-nested-string? v) (first v)
+                   :else v))))
 
 (defn ^:private transform-one
   "Returns a map representing one entry of a dataset. See `transform` for more details."
@@ -281,8 +312,8 @@
 
 (defn ^:private get-entities
   "Receives the connection and a content-type id, creates the url to fetch, fetches and
-  then returns a sligtly digested data structure with the payload.
-  
+  then returns a slightly digested data structure with the payload.
+
   The optional last parameter is a map with:
 
   `:select` - a collection of field names to be used when fetching this content-type
