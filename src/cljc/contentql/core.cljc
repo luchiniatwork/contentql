@@ -3,7 +3,6 @@
      (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require [om.next.impl.parser :as parser]
             [camel-snake-kebab.core :refer [->kebab-case-keyword]]
-            [clojure.string :as string]
             #?@(:clj
                 [[clj-http.client :as http]
                  [clojure.core.async :refer [<! >! chan go]]
@@ -148,31 +147,29 @@
 
 (declare ^:private transform)
 
-(defn ^:private reduce-nested-string?
-  "Helper function for the reducer function that tests for nested string values."
+(defn ^:private reduce-collection-entry?
+  "Helper function for the reducer function that tests for nested entry collections."
   [node]
-  (and (vector? node) (string? (first node))))
+  (and (coll? node)
+       (= (-> node first :sys :linkType) "Entry")))
 
-(defn ^:private reduce-collection?
-  "Helper function for the reducer function that tests for nested collections."
+(defn ^:private reduce-collection-asset?
+  "Helper function for the reducer function that tests for nested asset collections."
   [node]
-  (and (coll? node) (:sys (first node))))
+  (and (coll? node)
+       (= (-> node first :sys :linkType) "Asset")))
 
 (defn ^:private reduce-map-asset?
-  "Helper function for the reducer function that tests if the given map is of type asset"
+  "Helper function for the reducer function that tests if the given map is an asset"
   [node]
-  (and (map? node) (= (-> node
-                          :sys
-                          :linkType
-                          string/lower-case) "asset")))
+  (and (map? node)
+       (= (-> node :sys :linkType) "Asset")))
 
-(defn ^:private reduce-map-not-asset?
-  "Helper function for the reducer function that tests for a map that is not an asset"
+(defn ^:private reduce-map-entry?
+  "Helper function for the reducer function that tests if the given map is an entry"
   [node]
-  (and (map? node) (not (= (-> node
-                               :sys
-                               :linkType
-                               string/lower-case) "asset"))))
+  (and (map? node)
+       (= (-> node :sys :linkType) "Entry")))
 
 (defn ^:private match-linked-entries
   "Returns a vector with the linked-entries that match the ids of the provided dataset."
@@ -189,24 +186,21 @@
                :root false)))
 
 (defn ^:private reducer
-  "This reducer is te core of the recursive transformation. It uses the linked entries
+  "This reducer is the core of the recursive transformation. It uses the linked entries
   and linked assets provided as part of the partial injection to create the map tree."
   [{:keys [linked-entries linked-assets] :as options} accum k v]
   (let [new-key (->kebab-case-keyword (name k))]
     (assoc accum new-key
                  (cond
-                   ; There are scenarios in which you can have a map that is not an Asset
-                   ; (such as a single reference field).
-                   ; These two functions (reduce-map-asset? & reduce-map-not-asset?)
-                   ; will differentiate between the two and apply the right transformations.
+                   ;; TODO Rich text does not return the right data
                    (reduce-map-asset? v) (transform-image v linked-assets)
 
-                   (reduce-map-not-asset? v) (let [vector-v (vector v)]
-                                               (transform-collection vector-v options linked-entries))
+                   (reduce-map-entry? v) (first (transform-collection (vector v) options linked-entries))
 
-                   (reduce-collection? v) (transform-collection v options linked-entries)
+                   (reduce-collection-entry? v) (transform-collection v options linked-entries)
 
-                   (reduce-nested-string? v) (first v)
+                   (reduce-collection-asset? v) (mapv #(transform-image % linked-assets) v)
+
                    :else v))))
 
 (defn ^:private transform-one
@@ -269,9 +263,9 @@
      ;; this specifc content-type but this seemed like an overkill
      (go (let [res (<! (http/get url {:with-credentials? false}))]
            (as-> res x
-             (:body x)
-             (.parse js/JSON x)
-             (js->clj x :keywordize-keys true))))
+                 (:body x)
+                 (.parse js/JSON x)
+                 (js->clj x :keywordize-keys true))))
      :clj
      (let [c (chan)]
        (go (>! c (-> url
