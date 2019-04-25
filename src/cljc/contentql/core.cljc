@@ -268,10 +268,11 @@
                  (js->clj x :keywordize-keys true))))
      :clj
      (let [c (chan)]
-       (go (>! c (-> url
-                     (http/get {:accept :json})
-                     :body
-                     (json/parse-string true))))
+       (go (try (>! c (-> url
+                          (http/get {:accept :json})
+                          :body
+                          (json/parse-string true)))
+                (catch Exception e (>! c e))))
        c)))
 
 (defn ^:private build-entities-url
@@ -316,7 +317,9 @@
   [conn content-type & opts]
   (let [url (build-entities-url conn content-type (first opts))]
     (go (let [res (<! (get-json url))]
-          (transform (break-payload res))))))
+          (if (instance? Throwable res)
+            res
+            (transform (break-payload res)))))))
 
 ;; ------------------------------
 ;; Query filtering functions
@@ -403,10 +406,12 @@
   [conn query]
   (go (let [ast (parser/query->ast query)
             out (atom {})]
-        (doseq [{:keys [dispatch-key children params] :as sub-ast} (:children ast)]
+        (doseq [{:keys [dispatch-key children params ] :as sub-ast} (:children ast)]
           (let [opts {:select (ast-select->select children)
                       :params (ast-params->params params)}
                 entities (<! (get-entities conn dispatch-key opts))]
-            (swap! out assoc dispatch-key {:nodes (-> entities :nodes (filter-query sub-ast))
-                                           :info (:info entities)})))
-        @out)))
+            (if (instance? Throwable entities)
+              (swap! out assoc :exception entities)
+              (swap! out assoc dispatch-key {:nodes (-> entities :nodes (filter-query sub-ast))
+                                             :info (:info entities)}))))
+        (or (:exception @out) @out))))
